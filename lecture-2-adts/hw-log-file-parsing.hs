@@ -10,7 +10,13 @@ data MessageType = Info
 
 newtype Severity = Severity Int deriving (Show, Eq)
 
-parseWord :: String -> Maybe (String, String)
+newtype Parser a = Parser (String -> Maybe (a, String))
+
+instance Functor Parser where
+  --fmap :: (a -> b) -> Parser a -> Parser b
+  fmap = undefined
+
+parseWord :: Parser String
 parseWord "" = Nothing
 parseWord input = 
   let
@@ -19,13 +25,13 @@ parseWord input =
     go word (c:r) = go (c:word) r
   in  Just (go [] input)
 
-parseInt :: String -> Maybe (Int, String)
+parseInt :: Parser Int
 parseInt s = fmap convert parseWord s
   where convert :: Maybe (String, String) -> Maybe (Int, String)
         convert (Just (word, r)) = fmap (\i -> (i, r)) (readMaybe word)
         convert Nothing = Nothing
 
-parseSeverity :: String -> Maybe (Severity, String)
+parseSeverity :: Parser Severity
 parseSeverity = fmap (\(i, s) -> (Severity i, s)) . parseInt
 
 --parseMessageType :: String -> Maybe (MessageType, String)
