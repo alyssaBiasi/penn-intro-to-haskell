@@ -3,11 +3,17 @@ module NewModule where
 
 import qualified Text.Read as TR
 import Control.Monad
+import Data.Maybe
 
 data MessageType = Info
                  | Warning
                  | Error Severity
                  deriving (Show, Eq)
+
+type TimeStamp = Int
+data LogMessage = LogMessage MessageType TimeStamp String
+                | Unknown String
+                deriving (Show, Eq)
 
 newtype Severity = Severity Int deriving (Show, Eq, Ord)
 
@@ -40,20 +46,48 @@ parseWord =
     go word (c:r) = go (c:word) r
   in  Parser $ \s -> Just (go [] s)
 
+--parseInt :: Parser Int
+--parseInt = Parser $ \s -> (parse parseWord s) >>= convert
+--  where convert :: (String, String) -> Maybe (Int, String)
+--        convert (word, r) = fmap (\i -> (i, r)) (TR.readMaybe word)
+
 parseInt :: Parser Int
-parseInt = Parser $ \s -> (parse parseWord s) >>= convert
-  where convert :: (String, String) -> Maybe (Int, String)
-        convert (word, r) = fmap (\i -> (i, r)) (TR.readMaybe word)
+parseInt = do
+  word <- parseWord
+  maybeToParser $ TR.readMaybe word
+
+maybeToParser :: Maybe a -> Parser a
+maybeToParser = maybe failedParser pure
+
+failedParser :: Parser a
+failedParser = Parser $ \_ -> Nothing
+
+recoveringParser :: b -> Parser b -> String -> b
+recoveringParser defaultValue (Parser fb) = \s -> fst $ fromMaybe (defaultValue, s) (fb s)
+
+-----
+
+readLogMessage :: String -> LogMessage
+readLogMessage s = recoveringParser (Unknown s) parseValidLogMessage s
+
+parseValidLogMessage :: Parser LogMessage
+parseValidLogMessage = do
+  messageType <- parseMessageType
+  timeStamp <- parseTimeStamp
+  message <- parseRemaining
+  pure $ LogMessage messageType timeStamp message
+
+parseMessageType :: Parser MessageType
+parseMessageType = undefined
+
+parseTimeStamp :: Parser TimeStamp
+parseTimeStamp = undefined
+
+parseRemaining :: Parser String
+parseRemaining = undefined
 
 parseSeverity :: Parser Severity
 parseSeverity = fmap Severity parseInt
-
-
-parseInt2 :: Parser Int
-parseInt2 = do
-  word <- parseWord
-  pure TR.readMaybe word
-
 
 newParser = do
   w <- parseInt
@@ -63,8 +97,23 @@ newParser = do
 
 
 
+
 --parseMessageType :: String -> Maybe (MessageType, String)
 --parseMessageType ("I":r) = Just (Info, r)
 --parseMessageType ("W":r) = Just (Warning, r)
 --parseMessageType ("E":r) = parseSeverity
 
+{--
+Playground code:
+  maybe 0 (+1) Nothing
+
+  parse parseLogMessage "E 20 765 everything is broken"
+
+  parse parseLogMessage "I 877 working working"
+
+  parse parseLogMessage "W 875 slowly breaking"
+
+  readLogMessage "not a log message"
+
+  recoveringParser 0 parseInt "9"
+--}
