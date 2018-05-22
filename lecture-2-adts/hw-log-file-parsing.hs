@@ -37,6 +37,7 @@ instance Monad Parser where
   (Parser fa) >>= fab = Parser $ \s1 ->
     (fa s1) >>= \(a, s2) -> parse (fab a) s2
 
+----------------------------------------------------------
 
 parseWord :: Parser String
 parseWord =
@@ -65,7 +66,21 @@ failedParser = Parser $ \_ -> Nothing
 recoveringParser :: b -> Parser b -> String -> b
 recoveringParser defaultValue (Parser fb) = \s -> fst $ fromMaybe (defaultValue, s) (fb s)
 
+
+--parseN :: Int -> Parser a -> Parser [a]
+
 -----
+
+(|||) :: Parser a -> Parser a -> Parser a
+(|||) (Parser p1) (Parser p2) = Parser $ \s -> maybe (p2 s) Just (p1 s)
+
+(***) :: Semigroup a => Parser a -> Parser a -> Parser a
+(***) (Parser p1) (Parser p2) = Parser $ \s -> (p1 s) (p2 2)
+
+instance Monoid (Parser a) where
+  mappend = (|||)
+  mempty = failedParser
+
 
 readLogMessage :: String -> LogMessage
 readLogMessage s = recoveringParser (Unknown s) parseValidLogMessage s
@@ -105,15 +120,28 @@ newParser = do
 
 {--
 Playground code:
-  maybe 0 (+1) Nothing
+  maybe 0 (+1) (Just 3)
 
-  parse parseLogMessage "E 20 765 everything is broken"
+  --parse parseLogMessage "E 20 765 everything is broken"
 
-  parse parseLogMessage "I 877 working working"
+  --parse parseLogMessage "I 877 working working"
 
-  parse parseLogMessage "W 875 slowly breaking"
+  --parse parseLogMessage "W 875 slowly breaking"
 
   readLogMessage "not a log message"
 
   recoveringParser 0 parseInt "9"
+
+  --parse ( <|> pure 3 <|> parseInt) "87s"
+  --parseWarning <|> parseError <|> parseInfo
+
+
+
+
+  -- commutative
+  -- associative
+
+  parseInt ||| failedParser
+
+  parse (parseInt *** parseInt) "5" -- 10
 --}
