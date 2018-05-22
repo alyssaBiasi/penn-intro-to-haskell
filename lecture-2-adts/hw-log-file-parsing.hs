@@ -11,7 +11,9 @@ data MessageType = Info
 
 newtype Severity = Severity Int deriving (Show, Eq, Ord)
 
-newtype Parser a = Parser (String -> Maybe (a, String))
+newtype Parser a = Parser {
+  parse :: String -> Maybe (a, String)
+}
 
 instance Functor Parser where
   --fmap :: (a -> b) -> Parser a -> Parser b
@@ -19,16 +21,15 @@ instance Functor Parser where
     where mapFirst (a, r) = (f a, r)
 
 instance Applicative Parser where
---  pure :: a -> Parser a
   pure a = Parser $ \s -> Just (a, s)
-  -- (<*>) :: Parser a -> Parser (a -> b) -> Parser b
-  (Parser fa) <*> (Parser fab) = Parser $ \s -> (fa s) >>= convert
-    where convert :: (a, String) -> Maybe (b, String)
-          convert (a, r) = fmap (\(fb, w) -> (fb a, w)) (fab r)
+  -- (<*>) :: Parser (a -> b) -> Parser a -> Parser b
+  (Parser fab) <*> (Parser fa) = Parser $ \s -> ((fa s) >>= convert)
+    where convert (a, r) = fmap (\(fb, w) -> (fb a, w)) (fab r)
 
 instance Monad Parser where
 -- (>>=) :: Parser a -> (a -> Parse b) -> Parser b
-  (>>=) = undefined
+  (Parser fa) >>= fab = Parser $ \s1 ->
+    (fa s1) >>= \(a, s2) -> parse (fab a) s2
 
 
 parseWord :: Parser String
@@ -40,16 +41,25 @@ parseWord =
   in  Parser $ \s -> Just (go [] s)
 
 parseInt :: Parser Int
-parseInt = Parser $ \s -> (parse s parseWord) >>= convert
+parseInt = Parser $ \s -> (parse parseWord s) >>= convert
   where convert :: (String, String) -> Maybe (Int, String)
         convert (word, r) = fmap (\i -> (i, r)) (TR.readMaybe word)
 
 parseSeverity :: Parser Severity
 parseSeverity = fmap Severity parseInt
 
-parse :: String -> Parser a -> Maybe (a, String)
-parse s (Parser f) = f s
 
+parseInt2 :: Parser Int
+parseInt2 = do
+  word <- parseWord
+  pure TR.readMaybe word
+
+
+newParser = do
+  w <- parseInt
+  v <- parseInt
+  return $ w + v
+--newParser = parseInt >>= \w -> parseInt >>= \v -> pure (w + v)
 
 
 
